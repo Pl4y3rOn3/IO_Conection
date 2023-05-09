@@ -3,10 +3,12 @@
 
 //Adicionando bibliotecas
 #include <Arduino.h>
+//#include <Preferences.h>
 #include "rfmanager.h"
 #include "http.h"
 #include "esp_timer.h"
 #include "utilities.h"
+
 
 //#define TEST_HTTP_GET
 #define TEST_HTTP_POST
@@ -53,12 +55,15 @@ TinyGsmClient client(modem);
 #define IP5306_ADDR          0x75
 #define IP5306_REG_SYS_CTL0  0x00
 
-//Definindo deep sleep
-#define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define DEEP_SLEEP_TIME  10        /* Time ESP32 will go to sleep (in seconds) */
-
-// Verificando a conexão 
+// Variaveis de configuracao de integracao 
 bool wifi_is_connect = false;
+
+//Declarando variavel que não reseta
+RTC_DATA_ATTR int sleep_time = 10;
+
+//Definindo deep sleep
+#define uS_TO_S_FACTOR 1000000ULL    /* Conversion factor for micro seconds to seconds */
+#define DEEP_SLEEP_TIME sleep_time   /* Time ESP32 will go to sleep (in seconds) */
 
 void setup() {
 
@@ -71,32 +76,54 @@ void setup() {
   //Config WiFi
   //Tenta conectar o WiFi na rede e caso consiga retorna true, caso não retorna false
   wifi_is_connect = initWiFi();
+  int wifi_rssi = 0;
   
   if(wifi_is_connect == true){
 
+    wifi_rssi = WiFi.RSSI();
+
+    if(wifi_rssi >= -90){
+
+      #ifdef DEBUG_MODE
+      Serial.println("[WIFI] Success connection");
+      //Conferindo Forca so sinal
+      Serial.print("RSSI: ");
+      Serial.println(wifi_rssi);
+      #endif
+
+      //delay(1000);
+
+      int current = 25;
+      int power = 20;
+      bool httpSuccess = sendHttpToServer(current, power);
+
+      if(httpSuccess == false){
+        sleep_time = sleep_time*2;
+      }else{
+        sleep_time = 10;
+      }
+
+      //uint64_t end = esp_timer_get_time(); //Pega tempo final
+
+      #ifdef DEBUG_MODE
+      //Serial.printf("Tempo de execucao: %llu milisegundos", (end - start)/1000); // Realiza o calculo do ms
+      //Serial.println("");
+      Serial.println(sleep_time);
+      #endif
+      
+      if(httpSuccess == true){
+        #ifdef DEBUG_MODE
+        Serial.println("[DEEP SLEEP] Going to sleep!");
+        #endif
+        esp_deep_sleep_start();
+      }
+    }
     #ifdef DEBUG_MODE
-    //Conferindo Forca so sinal
-    Serial.print("RSSI: ");
-    Serial.println(WiFi.RSSI());
+      Serial.println("[WIFI] Connection to server failed");
     #endif
-
-    //delay(1000);
-
-    int current = 25;
-    int power = 20;
-    bool httpSuccess = sendHttpToServer(current, power);
-
-    //uint64_t end = esp_timer_get_time(); //Pega tempo final
-
-    #ifdef DEBUG_MODE
-    //Serial.printf("Tempo de execucao: %llu milisegundos", (end - start)/1000); // Realiza o calculo do ms
-    //Serial.println("");
-    Serial.println("[DEEP SLEEP] Going to sleep!");
-    #endif
-    
-    esp_deep_sleep_start();
+    wifi_is_connect = false;
   }
-  else{
+  if(wifi_is_connect == false){
     //Config GPRS
     // Set modem reset, enable, power pins
     pinMode(MODEM_PWRKEY, OUTPUT);
@@ -120,6 +147,8 @@ void setup() {
     if (strlen(simPIN) && modem.getSimStatus() != 3 ) {
       modem.simUnlock(simPIN);
     }
+  }else{
+    Serial.println("------------- ERROR Choice Conection------------");
   }
   
 }
@@ -166,15 +195,28 @@ void loop() {
     #endif
 
     unsigned long timeout = millis();
+    String response = "";
     while (client.connected() && millis() - timeout < 10000L) {
       // Print available data (HTTP response from server)
       while (client.available()) {
         char c = client.read();
-        Serial.print(c);
+        response += c;
+        //Serial.print(c);
         timeout = millis();
       }
     }
-    Serial.println();
+    //Serial.println();
+    Serial.println(response);
+
+    if (strncmp(response.c_str(), "HTTP/1.1 200", 12) == 0) {
+      sleep_time = 10;
+    }else {
+      sleep_time *= 2;
+    }
+
+    #ifdef DEBUG_MODE
+      Serial.println(sleep_time);
+    #endif
 
     //uint64_t end = esp_timer_get_time(); //Pega tempo final
 
