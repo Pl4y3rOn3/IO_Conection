@@ -28,10 +28,12 @@ bool initWiFi() {
     #endif
 
     if(tries++ >= 20) {
+      Serial.println("\n[WIFI] Failed connection");
       return false;
       //ESP.restart();
     }
   }
+  // Colocar verificação de RSSI
   
   #ifdef DEBUG_MODE
   Serial.println(WiFi.localIP());
