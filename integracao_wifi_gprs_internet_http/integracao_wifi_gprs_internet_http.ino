@@ -1,5 +1,5 @@
 #define SIM800L_AXP192_VERSION_20200327
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 //Adicionando bibliotecas
 #include <Arduino.h>
@@ -57,9 +57,10 @@ TinyGsmClient client(modem);
 
 // Variaveis de configuracao de integracao 
 bool wifi_is_connect = false;
+int test_conection_grps = 0;
 
 //Declarando variavel que não reseta
-RTC_DATA_ATTR int sleep_time = 10;
+RTC_DATA_ATTR int sleep_time = 2;
 
 //Definindo deep sleep
 #define uS_TO_S_FACTOR 1000000ULL    /* Conversion factor for micro seconds to seconds */
@@ -156,10 +157,17 @@ void setup() {
 void loop() {
   if(wifi_is_connect == false){
     //uint64_t start = esp_timer_get_time(); //Pega tempo inicial
+
     Serial.print("Connecting to APN: ");
     Serial.print(apn);
     if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
       Serial.println(" fail");
+      if(test_conection_grps >= 40){
+        sleep_time *= 2;
+        esp_deep_sleep_start();
+      }else{
+        test_conection_grps++;
+      }
       return;
     }
     
@@ -169,6 +177,7 @@ void loop() {
     Serial.print(server);
     if (!client.connect(server, port)) {
       Serial.println(" fail");
+      sleep_time *= 2;
       esp_deep_sleep_start();
     }
 

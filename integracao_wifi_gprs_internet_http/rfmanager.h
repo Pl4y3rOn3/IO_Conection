@@ -7,9 +7,13 @@
 //String ssid = "iot";
 //String pass = "ufrpe_iot";
 
+//Celular
+String ssid = "Teste-WiFi";
+String pass = "12345678";
+
 //Casa
-String ssid = "Luciana ^-^";
-String pass = "2luciana2";
+//String ssid = "Luciana ^-^";
+//String pass = "2luciana2";
 
 // Initialize WiFi
 bool initWiFi() {
